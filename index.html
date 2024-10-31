@@ -3,72 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Debug Google Maps</title>
+    <title>Force Visible Map</title>
     <style>
-        #map {
-            height: 400px;
-            width: 100%;
-            border: 2px solid red;
-            margin: 20px 0;
+        /* Force all parent elements to full height */
+        html, body {
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: #f0f0f0 !important;
         }
-        .debug-info {
+
+        /* Force map container to be visible */
+        #map {
+            height: 500px !important;
+            width: 100% !important;
+            min-height: 500px !important;
+            background-color: #e0e0e0 !important;
+            position: relative !important;
+            display: block !important;
+            visibility: visible !important;
+            z-index: 1 !important;
+        }
+
+        /* Debug container */
+        #debug {
             padding: 20px;
-            background: #f0f0f0;
+            background: white;
+            border: 1px solid black;
+            margin: 20px;
         }
     </style>
 </head>
 <body>
-    <div class="debug-info">
-        <h1>Debug Information</h1>
-        <p id="load-status">Page loaded...</p>
+    <div id="debug">
+        <h2>Debug Info</h2>
+        <div id="status">Loading...</div>
     </div>
 
     <div id="map"></div>
-    
+
     <script>
-        // Log when the page starts loading
-        console.log("Page starting to load");
-        document.getElementById('load-status').textContent += " Script section reached...";
+        // Update status
+        function updateStatus(message) {
+            const status = document.getElementById('status');
+            status.innerHTML += '<br>' + message;
+            console.log(message);
+        }
+
+        updateStatus('Script started...');
 
         function initMap() {
-            // Log when initMap is called
-            console.log("initMap function called");
-            document.getElementById('load-status').textContent += " initMap called...";
-
+            updateStatus('InitMap called...');
+            
             try {
-                // Try to create the map
-                const map = new google.maps.Map(document.getElementById("map"), {
-                    center: { lat: 37.7749, lng: -122.4194 },
-                    zoom: 12
+                // Basic map initialization
+                const mapElement = document.getElementById('map');
+                updateStatus(`Map element found: ${!!mapElement}`);
+                updateStatus(`Map element dimensions: ${mapElement.offsetWidth}x${mapElement.offsetHeight}`);
+
+                const map = new google.maps.Map(mapElement, {
+                    center: { lat: 0, lng: 0 }, // Center at 0,0
+                    zoom: 2, // Show whole world
+                    mapTypeId: google.maps.MapTypeId.ROADMAP
                 });
-                
-                document.getElementById('load-status').textContent += " Map created successfully!";
-                console.log("Map created successfully");
+
+                updateStatus('Map object created');
+
+                // Add a marker at the center
+                new google.maps.Marker({
+                    position: { lat: 0, lng: 0 },
+                    map: map,
+                    title: "Center"
+                });
+
+                updateStatus('Marker added');
             } catch (error) {
-                // Log any errors that occur
-                document.getElementById('load-status').textContent += ` Error: ${error.message}`;
-                console.error("Error creating map:", error);
+                updateStatus(`Error: ${error.message}`);
+                console.error(error);
             }
         }
 
-        // Make sure initMap is globally available
         window.initMap = initMap;
+        updateStatus('Window.initMap set');
     </script>
 
-    <!-- Add error handling for script loading -->
-    <script>
-        function handleScriptError() {
-            document.getElementById('load-status').textContent += " Google Maps script failed to load!";
-            console.error("Google Maps script failed to load");
-        }
-    </script>
-
-    <!-- Load Google Maps with error handling -->
     <script 
-        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&callback=initMap" 
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&callback=initMap"
         async 
         defer
-        onerror="handleScriptError()"
     ></script>
 </body>
 </html>
