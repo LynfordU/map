@@ -1,10 +1,96 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Test Page</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Force Visible Map</title>
+    <style>
+        /* Force all parent elements to full height */
+        html, body {
+            height: 100vh !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background-color: #f0f0f0 !important;
+        }
+
+        /* Force map container to be visible */
+        #map {
+            height: 500px !important;
+            width: 100% !important;
+            min-height: 500px !important;
+            background-color: #e0e0e0 !important;
+            position: relative !important;
+            display: block !important;
+            visibility: visible !important;
+            z-index: 1 !important;
+        }
+
+        /* Debug container */
+        #debug {
+            padding: 20px;
+            background: white;
+            border: 1px solid black;
+            margin: 20px;
+        }
+    </style>
 </head>
 <body>
-    <h1>Test Page</h1>
-    <p>If you can see this, HTML is working!</p>
+    <div id="debug">
+        <h2>Debug Info</h2>
+        <div id="status">Loading...</div>
+    </div>
+
+    <div id="map"></div>
+
+    <script>
+        // Update status
+        function updateStatus(message) {
+            const status = document.getElementById('status');
+            status.innerHTML += '<br>' + message;
+            console.log(message);
+        }
+
+        updateStatus('Script started...');
+
+        function initMap() {
+            updateStatus('InitMap called...');
+            
+            try {
+                // Basic map initialization
+                const mapElement = document.getElementById('map');
+                updateStatus(`Map element found: ${!!mapElement}`);
+                updateStatus(`Map element dimensions: ${mapElement.offsetWidth}x${mapElement.offsetHeight}`);
+
+                const map = new google.maps.Map(mapElement, {
+                    center: { lat: 0, lng: 0 }, // Center at 0,0
+                    zoom: 2, // Show whole world
+                    mapTypeId: google.maps.MapTypeId.ROADMAP
+                });
+
+                updateStatus('Map object created');
+
+                // Add a marker at the center
+                new google.maps.Marker({
+                    position: { lat: 0, lng: 0 },
+                    map: map,
+                    title: "Center"
+                });
+
+                updateStatus('Marker added');
+            } catch (error) {
+                updateStatus(`Error: ${error.message}`);
+                console.error(error);
+            }
+        }
+
+        window.initMap = initMap;
+        updateStatus('Window.initMap set');
+    </script>
+
+    <script 
+        src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&callback=initMap"
+        async 
+        defer
+    ></script>
 </body>
 </html>
