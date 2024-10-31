@@ -1,0 +1,102 @@
+<div id="map"></div>
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&map_ids=39252d46211cfba9&callback=initMap" async defer></script>
+
+<script>
+    function initMap() {
+        console.log("initMap called");
+        const map = new google.maps.Map(document.getElementById("map"), {
+            center: { lat: 37.7749, lng: -122.4194 },
+            zoom: 12,
+            mapId: "39252d46211cfba9",
+        });
+        
+        fetchDataFromContactBucket(map);
+    }
+
+    function fetchDataFromContactBucket(map) {
+        const contactBucket = "contact-address-bucket";
+        const contactFile = "contacts.csv";
+
+        console.log(`Fetching from bucket: ${contactBucket}, file: ${contactFile}`);
+        
+        const url = `https://storage.googleapis.com/${contactBucket}/${contactFile}`;
+        
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.text();
+            })
+            .then(csvData => {
+                console.log(`Got data from ${contactBucket}/${contactFile}`);
+                const markers = parseCSVAndCreateMarkers(csvData);
+                addMarkersToMap(map, markers);
+            })
+            .catch(error => {
+                console.error(`Error with ${contactBucket}/${contactFile}:`, error);
+            });
+    }
+
+    function parseCSVAndCreateMarkers(csvData) {
+        // Split into lines and remove any empty lines
+        const lines = csvData.trim().split('\n').filter(line => line.trim());
+        
+        // Parse headers - remove quotes and trim
+        const headers = lines[0].split(',').map(header => 
+            header.replace(/^"/, '').replace(/"$/, '').trim()
+        );
+        console.log("Cleaned Headers:", headers);
+
+        const markers = [];
+
+        // Process each data row
+        for (let i = 1; i < lines.length; i++) {
+            // Split the line by commas, but only if they're not within quotes
+            const row = lines[i].match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+            
+            if (row.length === headers.length) {
+                const data = {};
+                headers.forEach((header, index) => {
+                    // Remove quotes and trim each value
+                    let value = row[index];
+                    if (value) {
+                        value = value.replace(/^"/, '').replace(/"$/, '').trim();
+                    }
+                    data[header] = value;
+                });
+                
+                console.log("Processing row:", data);
+                
+                const latitude = parseFloat(data.latitude) || parseFloat(data.lat);
+                const longitude = parseFloat(data.longitude) || parseFloat(data.lng) || parseFloat(data.long);
+
+                // Filter for "Quality Structures" in properties_shed_company
+                if (data.properties_shed_company === "Quality Structures" && latitude && longitude) {
+                    console.log("Found matching company:", data);
+                    markers.push({
+                        latitude: latitude,
+                        longitude: longitude,
+                        name: data.properties_shed_company
+                    });
+                }
+            }
+        }
+        console.log(`Parsed ${markers.length} markers for Quality Structures`);
+        return markers;
+    }
+
+    function addMarkersToMap(map, markers) {
+        markers.forEach(markerData => {
+            new google.maps.Marker({
+                position: { 
+                    lat: markerData.latitude, 
+                    lng: markerData.longitude 
+                },
+                map: map,
+                title: markerData.name
+            });
+        });
+    }
+</script>
