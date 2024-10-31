@@ -104,6 +104,18 @@
             border-radius: 5px;
             display: block;
         }
+        #legend div {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        #legend div span {
+            width: 15px;
+            height: 15px;
+            display: inline-block;
+            margin-right: 10px;
+            border-radius: 50%;
+        }
         #dateFilter {
             display: flex;
             align-items: center;
@@ -142,7 +154,6 @@
             <div class="dropdown-content" id="leadStatusFilter">
                 <label><input type="checkbox" value="ATTEMPTED_TO_CONTACT"> Attempted to Contact</label>
                 <label><input type="checkbox" value="IN_PROGRESS"> In Progress</label>
-                <!-- Add additional statuses as needed -->
             </div>
         </div>
         <div id="dateFilter">
@@ -161,7 +172,10 @@
     <div id="legend">
         <div><span style="background-color: #FF6347;"></span> Quality Structures</div>
         <div><span style="background-color: #4682B4;"></span> Champion Buildings</div>
-        <!-- Add additional legend entries as needed -->
+        <div><span style="background-color: #32CD32;"></span> Bitterroot Shedz</div>
+        <div><span style="background-color: #FFD700;"></span> TruPoint Backyards</div>
+        <div><span style="background-color: #FF69B4;"></span> Mountain View Barns</div>
+        <div><span style="background-color: #8A2BE2;"></span> Eshs Utility Buildings</div>
     </div>
 
     <!-- JavaScript code -->
@@ -280,9 +294,9 @@
                         map,
                         markers,
                         algorithm: new markerClusterer.SuperClusterAlgorithm({
-                            radius: 40, // Adjusted for earlier clustering
-                            maxZoom: 16, // So clusters split earlier when zoomed close
-                            minPoints: 10 // To cluster with fewer markers initially
+                            radius: 80, // More aggressive clustering
+                            maxZoom: 14, // Clustering remains until closer zoom
+                            minPoints: 5 // Clusters start with fewer points
                         })
                     });
                 }
