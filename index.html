@@ -166,13 +166,11 @@
 
     <!-- JavaScript code -->
     <script>
-        // Global variables
         let cachedData = null;
         let isHeatmap = true;
         let startDateValue = null;
         let endDateValue = null;
 
-        // Date Range Picker Initialization
         $(function() {
             $('#dateRange').daterangepicker({
                 opens: 'left',
@@ -194,7 +192,6 @@
             });
         });
 
-        // Function to parse CSV
         function parseCSV(csvData) {
             const lines = csvData.trim().split('\n').filter(line => line.trim());
             const headers = lines[0].split(',').map(header => header.trim().replace(/^"|"$/g, ''));
@@ -217,6 +214,15 @@
             let heatmap;
             let markers = [];
             let currentClusterer = null;
+
+            const companyColors = {
+                "quality structures": "#FF6347",
+                "champion buildings": "#4682B4",
+                "bitterroot shedz": "#32CD32",
+                "trupoint backyards": "#FFD700",
+                "mountain view barns": "#FF69B4",
+                "eshs utility buildings": "#8A2BE2"
+            };
 
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 44.3148, lng: -85.6024 },
@@ -252,19 +258,31 @@
                         opacity: 0.5,
                     });
                 } else {
-                    const newMarkers = validData.map(row => new google.maps.Marker({
-                        position: { lat: row.latitude, lng: row.longitude },
-                        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 8, fillColor: "#FF0000", fillOpacity: 1, strokeWeight: 1 }
-                    }));
+                    const newMarkers = validData.map(row => {
+                        const companyKey = row.properties_shed_company?.trim().toLowerCase();
+                        const markerIcon = {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 8,
+                            fillColor: companyColors[companyKey] || "#FF0000",
+                            fillOpacity: 1,
+                            strokeWeight: 1
+                        };
+                        
+                        return new google.maps.Marker({
+                            position: { lat: row.latitude, lng: row.longitude },
+                            icon: markerIcon,
+                            title: row.properties_shed_company || "Shed Location",
+                        });
+                    });
 
                     markers = newMarkers;
                     currentClusterer = new markerClusterer.MarkerClusterer({
                         map,
                         markers,
                         algorithm: new markerClusterer.SuperClusterAlgorithm({
-                            radius: 60,
-                            maxZoom: 18,
-                            minPoints: 15
+                            radius: 40, // Adjusted for earlier clustering
+                            maxZoom: 16, // So clusters split earlier when zoomed close
+                            minPoints: 10 // To cluster with fewer markers initially
                         })
                     });
                 }
