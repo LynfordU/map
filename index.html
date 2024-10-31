@@ -164,7 +164,7 @@
         <!-- Add additional legend entries as needed -->
     </div>
 
-    <!-- Include your JavaScript code here -->
+    <!-- JavaScript code -->
     <script>
         // Global variables
         let cachedData = null;
@@ -172,21 +172,21 @@
         let startDateValue = null;
         let endDateValue = null;
 
-        // Initialize Date Range Picker
+        // Date Range Picker Initialization
         $(function() {
             $('#dateRange').daterangepicker({
                 opens: 'left',
                 autoUpdateInput: false,
                 locale: { cancelLabel: 'Clear' },
                 ranges: { 'All Time': [moment('2020-01-01'), moment()], 'Last 7 Days': [moment().subtract(6, 'days'), moment()] }
-            }, function(start, end, label) {
+            }, function(start, end) {
                 startDateValue = start.startOf('day').toDate();
                 endDateValue = end.endOf('day').toDate();
                 $('#dateRange').val(start.format('YYYY-MM-DD') + ' - ' + end.format('YYYY-MM-DD'));
                 if (cachedData && window.displayData) window.displayData(cachedData);
             });
 
-            $('#dateRange').on('cancel.daterangepicker', function(ev, picker) {
+            $('#dateRange').on('cancel.daterangepicker', function() {
                 $(this).val('');
                 startDateValue = null;
                 endDateValue = null;
@@ -194,7 +194,24 @@
             });
         });
 
-        // Fetch and parse data, then initialize map
+        // Function to parse CSV
+        function parseCSV(csvData) {
+            const lines = csvData.trim().split('\n').filter(line => line.trim());
+            const headers = lines[0].split(',').map(header => header.trim().replace(/^"|"$/g, ''));
+            const data = [];
+            lines.slice(1).forEach(line => {
+                const values = line.match(/(".*?"|[^",]+)(?=\s*,|\s*$)/g) || [];
+                const row = headers.reduce((obj, header, index) => {
+                    obj[header] = values[index]?.replace(/^"|"$/g, '').trim() || "";
+                    return obj;
+                }, {});
+                row.latitude = parseFloat(row.latitude || row.lat);
+                row.longitude = parseFloat(row.longitude || row.lng || row.long);
+                data.push(row);
+            });
+            return data;
+        }
+
         function initMap() {
             let map;
             let heatmap;
@@ -224,7 +241,6 @@
             function displayData(data) {
                 clearMap();
 
-                // Apply filters and update pin display
                 const validData = data.filter(row => !isNaN(row.latitude) && !isNaN(row.longitude));
                 document.getElementById("legend").style.display = isHeatmap ? "none" : "block";
 
@@ -260,7 +276,6 @@
                 markers = [];
             }
 
-            // Expose functions to the global scope
             window.displayData = displayData;
             window.toggleHeatmap = function() {
                 isHeatmap = !isHeatmap;
@@ -269,9 +284,8 @@
         }
     </script>
 
-    <!-- Include Google Maps and MarkerClusterer scripts -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
+    <!-- Google Maps and MarkerClusterer -->
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
 </html>
-
