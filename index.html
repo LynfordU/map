@@ -3,6 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <title>Shed Sales Map</title>
+    <!-- Include jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <!-- Include Moment.js -->
+    <script src="https://cdn.jsdelivr.net/momentjs/latest/moment.min.js"></script>
+    <!-- Include Date Range Picker CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.css">
+    <!-- Include Date Range Picker JS -->
+    <script src="https://cdn.jsdelivr.net/npm/daterangepicker/daterangepicker.min.js"></script>
     <style>
         /* CSS Styles */
         body {
@@ -27,9 +35,12 @@
         }
         #controls {
             display: flex;
+            flex-wrap: wrap;
             gap: 10px;
             margin: 20px;
             font-size: 16px;
+            justify-content: center;
+            align-items: center;
         }
         #map-container {
             width: 100%;
@@ -108,6 +119,19 @@
             margin-right: 10px;
             border-radius: 50%;
         }
+        #dateFilter {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        #dateFilter label {
+            font-size: 14px;
+        }
+        #dateFilter input {
+            padding: 5px;
+            font-size: 14px;
+            width: 250px;
+        }
         @media (max-width: 768px) {
             #map {
                 height: 60vh;
@@ -118,7 +142,7 @@
             }
         }
     </style>
-</head>
+<script defer data-domain="lavender-alverta-82.tiiny.site" src="https://analytics.tiiny.site/js/plausible.js"></script><script type="text/javascript" src="https://tiiny.host/ad-script.js"></script></head>
 <body>
     <div class="header">
         <img src="https://goldmineshedsales.com/hubfs/Goldmine%20Logo%20Cropped%20Latest.png" alt="Gold Mine Shed Sales Logo">
@@ -156,6 +180,13 @@
             </div>
         </div>
         
+        <div id="dateFilter">
+            <label>
+                Date Range:
+                <input type="text" id="dateRange" placeholder="Select Date Range">
+            </label>
+        </div>
+
         <button onclick="toggleHeatmap()">Toggle Heatmap/Pins</button>
         <button onclick="refreshData()">Refresh Data</button>
     </div>
@@ -173,10 +204,45 @@
         <div><span style="background-color: #8A2BE2;"></span> Eshs Utility Buildings</div>
     </div>
 
+    <!-- Include your JavaScript code here -->
     <script>
         // Global variables
         let cachedData = null;
         let isHeatmap = true;
+        let startDateValue = null;
+        let endDateValue = null;
+
+        // Initialize Date Range Picker
+        $(function() {
+            $('#dateRange').daterangepicker({
+                opens: 'left',
+                autoUpdateInput: false,
+                locale: {
+                    cancelLabel: 'Clear'
+                },
+                ranges: {
+                    'All Time': [moment('2020-01-01'), moment()],
+                    'Last 7 Days': [moment().subtract(6, 'days'), moment()],
+                    'Last 30 Days': [moment().subtract(29, 'days'), moment()],
+                }
+            }, function(start, end, label) {
+                startDateValue = start.startOf('day').toDate();
+                endDateValue = end.endOf('day').toDate();
+                $('#dateRange').val(start.format('YYYY-MM-DD') + ' - ' + end.format('YYYY-MM-DD'));
+                if (cachedData && window.displayData) {
+                    window.displayData(cachedData);
+                }
+            });
+
+            $('#dateRange').on('cancel.daterangepicker', function(ev, picker) {
+                $(this).val('');
+                startDateValue = null;
+                endDateValue = null;
+                if (cachedData && window.displayData) {
+                    window.displayData(cachedData);
+                }
+            });
+        });
 
         // Event listeners for filters and buttons
         document.getElementById('companyFilterButton').addEventListener('click', function(e) {
@@ -200,6 +266,7 @@
             });
         });
 
+        // Event listeners for checkboxes
         document.querySelectorAll('#companyFilter input, #leadStatusFilter input').forEach(checkbox => {
             checkbox.addEventListener('change', () => {
                 updateFilterButtonText();
@@ -270,9 +337,19 @@
                 }, {});
                 row.latitude = parseFloat(row.latitude || row.lat);
                 row.longitude = parseFloat(row.longitude || row.lng || row.long);
-                if (!isNaN(row.latitude) && !isNaN(row.longitude)) data.push(row);
+                data.push(row);
             });
             return data;
+        }
+
+        // Debounce function to limit the rate of function calls
+        function debounce(func, wait) {
+            let timeout;
+            return function() {
+                const context = this, args = arguments;
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(context, args), wait);
+            };
         }
 
         // Initialize the map and related functions after the API has loaded
@@ -282,7 +359,6 @@
             let heatmap;
             let markers = [];
             let currentClusterer = null;
-            let currentViewport = null;
 
             const companyColors = {
                 "quality structures": "#FF6347",
@@ -310,13 +386,6 @@
                 mapId: "39252d46211cfba9",
             });
             
-            map.addListener('idle', () => {
-                currentViewport = map.getBounds();
-                if (cachedData && !isHeatmap) {
-                    displayData(cachedData);
-                }
-            });
-            
             map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById("legend"));
             fetchData();
 
@@ -331,25 +400,34 @@
                     .catch(error => console.error("Error loading data:", error));
             }
 
+            // Debounced displayData function
+            const debouncedDisplayData = debounce(function(data) {
+                displayData(data);
+            }, 300);
+
             function displayData(data) {
                 clearMap();
                 const selectedCompanies = Array.from(document.querySelectorAll("#companyFilter input:checked")).map(input => input.value.toLowerCase());
                 const selectedLeadStatuses = Array.from(document.querySelectorAll("#leadStatusFilter input:checked")).map(input => input.value);
-                
+
                 let filteredData = data.filter(row => {
                     const companyName = row.properties_shed_company?.trim().toLowerCase();
                     const companyMatch = selectedCompanies.length === 0 || selectedCompanies.includes(companyName);
                     const statusMatch = selectedLeadStatuses.length === 0 || selectedLeadStatuses.includes(row.properties_hs_lead_status);
-                    return companyMatch && statusMatch;
+
+                    let dateMatch = true;
+                    if (startDateValue || endDateValue) {
+                        const createdDate = parseDateString(row.properties_createdate);
+                        if (!createdDate) return false;
+                        if (startDateValue && createdDate < startDateValue) dateMatch = false;
+                        if (endDateValue && createdDate > endDateValue) dateMatch = false;
+                    }
+
+                    return companyMatch && statusMatch && dateMatch;
                 });
 
-                if (currentViewport && !isHeatmap) {
-                    filteredData = filteredData.filter(row => {
-                        return currentViewport.contains({ lat: row.latitude, lng: row.longitude });
-                    });
-                }
+                const validData = filteredData.filter(row => !isNaN(row.latitude) && !isNaN(row.longitude));
 
-                const validData = filteredData.filter(row => row.latitude && row.longitude);
                 document.getElementById("legend").style.display = isHeatmap ? "none" : "block";
 
                 if (isHeatmap) {
@@ -364,7 +442,7 @@
                         opacity: 0.5,
                     });
                 } else {
-                    validData.forEach(row => {
+                    const newMarkers = validData.map(row => {
                         const companyKey = row.properties_shed_company?.trim().toLowerCase();
                         const markerIcon = markerIcons[companyKey] || {
                             path: google.maps.SymbolPath.CIRCLE,
@@ -374,21 +452,22 @@
                             strokeWeight: 1
                         };
                         
-                        const marker = new google.maps.Marker({
+                        return new google.maps.Marker({
                             position: { lat: row.latitude, lng: row.longitude },
                             title: row.properties_shed_company || "Shed Location",
                             icon: markerIcon
                         });
-                        markers.push(marker);
                     });
+
+                    markers = newMarkers;
 
                     currentClusterer = new markerClusterer.MarkerClusterer({
                         map,
                         markers,
                         algorithm: new markerClusterer.SuperClusterAlgorithm({
-                            radius: 120,     // Increased radius for more clustering when zoomed out
-                            maxZoom: 10,     // Decreased maxZoom so clustering persists further
-                            minPoints: 15    // Clusters only form when there are at least 15 markers
+                            radius: 80,
+                            maxZoom: 16,
+                            minPoints: 5
                         }),
                         renderer: {
                             render: ({ count, position }) => {
@@ -396,7 +475,7 @@
                                     position,
                                     icon: {
                                         path: google.maps.SymbolPath.CIRCLE,
-                                        scale: Math.log10(count) * 8 + 12,
+                                        scale: Math.min(Math.max(count / 10, 20), 60),
                                         fillColor: "#4285F4",
                                         fillOpacity: 0.7,
                                         strokeWeight: 1,
@@ -407,14 +486,9 @@
                                         color: "white",
                                         fontSize: "12px"
                                     },
-                                    zIndex: 1000 + count
+                                    zIndex: Number(google.maps.Marker.MAX_ZINDEX) + count
                                 });
                             }
-                        },
-                        onClusterClick: (_, cluster, map) => {
-                            const zoom = Math.min(map.getZoom() + 2, 15);
-                            map.setZoom(zoom);
-                            map.setCenter(cluster.position);
                         }
                     });
                 }
@@ -423,28 +497,31 @@
             function clearMap() {
                 if (heatmap) heatmap.setMap(null);
                 if (currentClusterer) {
-                    currentClusterer.clearMarkers();
+                    currentClusterer.setMap(null);
                     currentClusterer = null;
                 }
-                markers.forEach(marker => marker.setMap(null));
                 markers = [];
             }
 
+            // Function to parse the date string using Moment.js
+            function parseDateString(dateString) {
+                if (!dateString) return null;
+                return moment.utc(dateString).toDate();
+            }
+
             // Expose functions to the global scope
-            window.displayData = displayData;
+            window.displayData = debouncedDisplayData;
             window.toggleHeatmap = function() {
                 isHeatmap = !isHeatmap;
                 if (cachedData) {
-                    displayData(cachedData);
+                    window.displayData(cachedData);
                 }
             };
         }
     </script>
-    <!-- Load the Google Maps API asynchronously -->
+
+    <!-- Include Google Maps and MarkerClusterer scripts -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
-    <!-- Include MarkerClusterer library -->
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
 </html>
-
-
