@@ -19,6 +19,8 @@
             display: flex;
             justify-content: flex-start;
             align-items: center;
+            background-color: #fff;
+            box-shadow: 0px 4px 8px rgba(0, 0, 0, 0.1);
         }
         .header img {
             height: 60px;
@@ -46,12 +48,13 @@
             border-radius: 8px;
             touch-action: none;
         }
-        .dropdown {
+        .dropdown, .date-filter {
             position: relative;
             display: inline-block;
             width: 200px;
+            margin: 0 10px;
         }
-        .dropdown button {
+        .dropdown button, .date-filter input {
             width: 100%;
             padding: 10px;
             font-size: 16px;
@@ -108,12 +111,11 @@
             margin-right: 10px;
             border-radius: 50%;
         }
-        .date-filter {
-            display: flex;
-            align-items: center;
-        }
         .date-filter label {
-            margin-right: 10px;
+            font-size: 14px;
+            color: #333;
+            display: block;
+            margin-bottom: 5px;
         }
         @media (max-width: 768px) {
             #map {
@@ -164,8 +166,10 @@
         </div>
         
         <div class="date-filter">
-            <label for="dateFilter">Filter by Date:</label>
-            <input type="date" id="dateFilter" onchange="applyDateFilter()">
+            <label for="startDate">Start Date:</label>
+            <input type="date" id="startDate" onchange="applyDateFilter()">
+            <label for="endDate">End Date:</label>
+            <input type="date" id="endDate" onchange="applyDateFilter()">
         </div>
 
         <button onclick="toggleHeatmap()">Toggle Heatmap/Pins</button>
@@ -189,6 +193,15 @@
         let cachedData = null;
         let isHeatmap = true;
 
+        const companyColors = {
+            "Quality Structures": "#FF6347",
+            "Champion Buildings": "#4682B4",
+            "Bitterroot Shedz": "#32CD32",
+            "TruPoint Backyards": "#FFD700",
+            "Mountain View Barns": "#FF69B4",
+            "Eshs Utility Buildings": "#8A2BE2"
+        };
+
         document.getElementById('companyFilterButton').addEventListener('click', function(e) {
             e.stopPropagation();
             const dropdown = this.parentElement;
@@ -210,35 +223,13 @@
             });
         });
 
-        document.querySelectorAll('#companyFilter input, #leadStatusFilter input').forEach(checkbox => {
-            checkbox.addEventListener('change', () => {
-                updateFilterButtonText();
-                if (cachedData && displayData) {
-                    displayData(cachedData);
-                }
-            });
-        });
-
-        function updateFilterButtonText() {
-            const selectedCompanies = Array.from(document.querySelectorAll("#companyFilter input:checked")).map(input => input.value);
-            document.getElementById('companyFilterButton').textContent = selectedCompanies.length > 0 
-                ? `${selectedCompanies.length} Companies Selected`
-                : 'Select Companies';
-
-            const selectedStatuses = Array.from(document.querySelectorAll("#leadStatusFilter input:checked")).map(input => input.value);
-            document.getElementById('leadStatusFilterButton').textContent = selectedStatuses.length > 0
-                ? `${selectedStatuses.length} Statuses Selected`
-                : 'Select Lead Status';
-        }
-
         function applyDateFilter() {
-            const dateValue = document.getElementById("dateFilter").value;
-            if (!dateValue) return;
+            const startDate = new Date(document.getElementById("startDate").value);
+            const endDate = new Date(document.getElementById("endDate").value);
 
             const filteredData = cachedData.filter(row => {
                 const createdDate = new Date(row.properties_createdate);
-                const selectedDate = new Date(dateValue);
-                return createdDate.toDateString() === selectedDate.toDateString();
+                return (!isNaN(startDate) && createdDate >= startDate) && (!isNaN(endDate) && createdDate <= endDate);
             });
 
             if (displayData) {
@@ -300,13 +291,20 @@
             }
 
             window.displayData = function(data) {
-                // Clear existing markers or heatmaps here.
                 data.forEach(row => {
                     const position = new google.maps.LatLng(row.latitude, row.longitude);
+                    const company = row.properties_shed_company;
                     new google.maps.Marker({
                         position,
                         map,
-                        title: row.properties_shed_company,
+                        title: company,
+                        icon: {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 8,
+                            fillColor: companyColors[company] || '#FF0000',
+                            fillOpacity: 1,
+                            strokeWeight: 1,
+                        },
                     });
                 });
             };
@@ -319,7 +317,7 @@
             }
         };
     </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
 </html>
