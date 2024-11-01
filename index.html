@@ -176,6 +176,10 @@
     <script>
         let cachedData = null;
         let isHeatmap = true;
+        let heatmap;
+        let map;
+        let markers = [];
+        let currentClusterer = null;
 
         // Date filtering function
         function handleDateFilter(data, startDate, endDate) {
@@ -222,9 +226,34 @@
             const validData = filteredData.filter(row => row.latitude && row.longitude);
 
             if (isHeatmap) {
-                // Heatmap logic
+                heatmap = new google.maps.visualization.HeatmapLayer({
+                    data: validData.map(row => ({
+                        location: new google.maps.LatLng(row.latitude, row.longitude),
+                        weight: 1
+                    })),
+                    map: map,
+                    dissipating: true,
+                    radius: 15,
+                    opacity: 0.5,
+                });
             } else {
-                // Markers logic
+                validData.forEach(row => {
+                    const marker = new google.maps.Marker({
+                        position: { lat: row.latitude, lng: row.longitude },
+                        map: map,
+                    });
+                    markers.push(marker);
+                });
+
+                currentClusterer = new markerClusterer.MarkerClusterer({
+                    map,
+                    markers,
+                    algorithm: new markerClusterer.SuperClusterAlgorithm({
+                        radius: 120,
+                        maxZoom: 10,
+                        minPoints: 15
+                    })
+                });
             }
         }
 
@@ -251,24 +280,24 @@
 
         // Initialize the map
         function initMap() {
-            let map = new google.maps.Map(document.getElementById("map"), {
+            map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 44.3148, lng: -85.6024 },
                 zoom: 8,
                 mapId: "39252d46211cfba9",
             });
 
             fetchData();
+        }
 
-            function fetchData() {
-                const url = "https://storage.googleapis.com/contact-address-bucket/contacts.csv";
-                fetch(url)
-                    .then(response => response.ok ? response.text() : Promise.reject(response))
-                    .then(csvData => {
-                        cachedData = parseCSV(csvData);
-                        displayData(cachedData);
-                    })
-                    .catch(error => console.error("Error loading data:", error));
-            }
+        function fetchData() {
+            const url = "https://storage.googleapis.com/contact-address-bucket/contacts.csv";
+            fetch(url)
+                .then(response => response.ok ? response.text() : Promise.reject(response))
+                .then(csvData => {
+                    cachedData = parseCSV(csvData);
+                    displayData(cachedData);
+                })
+                .catch(error => console.error("Error loading data:", error));
         }
 
         function clearMap() {
@@ -279,6 +308,13 @@
             }
             markers.forEach(marker => marker.setMap(null));
             markers = [];
+        }
+
+        function toggleHeatmap() {
+            isHeatmap = !isHeatmap;
+            if (cachedData) {
+                displayData(cachedData);
+            }
         }
 
         function parseCSV(csvData) {
@@ -335,8 +371,9 @@
         // Expose functions globally
         window.displayData = displayData;
         window.initMap = initMap;
+        window.toggleHeatmap = toggleHeatmap;
     </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
 </html>
