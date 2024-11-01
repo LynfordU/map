@@ -229,7 +229,7 @@
             let markers = [];
             let currentClusterer = null;
 
-            const companyColors = {
+            const companyIcons = {
                 "quality structures": "https://path-to-quality-structures-icon.png",
                 "champion buildings": "https://path-to-champion-buildings-icon.png",
                 "bitterroot shedz": "https://path-to-bitterroot-shedz-icon.png",
@@ -274,13 +274,13 @@
                 } else {
                     const newMarkers = validData.map(row => {
                         const companyKey = row.properties_shed_company?.trim().toLowerCase();
-                        const markerIcon = companyColors[companyKey] || "https://path-to-default-icon.png";
+                        const markerIcon = companyIcons[companyKey] || "https://path-to-default-icon.png";
                         
-                        return new google.maps.marker.AdvancedMarkerElement({
+                        return new google.maps.Marker({
                             position: { lat: row.latitude, lng: row.longitude },
+                            icon: { url: markerIcon, scaledSize: new google.maps.Size(24, 24) },
                             map: map,
-                            content: `<img src="${markerIcon}" alt="${companyKey} icon">`,
-                            title: row.properties_shed_company || "Shed Location"
+                            title: row.properties_shed_company || "Shed Location",
                         });
                     });
 
