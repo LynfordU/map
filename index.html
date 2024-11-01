@@ -213,8 +213,8 @@
         document.querySelectorAll('#companyFilter input, #leadStatusFilter input').forEach(checkbox => {
             checkbox.addEventListener('change', () => {
                 updateFilterButtonText();
-                if (cachedData && window.displayData) {
-                    window.displayData(cachedData);
+                if (cachedData && displayData) {
+                    displayData(cachedData);
                 }
             });
         });
@@ -241,8 +241,8 @@
                 return createdDate.toDateString() === selectedDate.toDateString();
             });
 
-            if (window.displayData) {
-                window.displayData(filteredData);
+            if (displayData) {
+                displayData(filteredData);
             }
         }
 
@@ -252,9 +252,9 @@
                 .then(response => response.ok ? response.text() : Promise.reject(response))
                 .then(csvData => {
                     cachedData = parseCSV(csvData);
-                    applyDateFilter();  // Apply date filter on data refresh
-                    if (window.displayData) {
-                        window.displayData(cachedData);
+                    applyDateFilter();
+                    if (displayData) {
+                        displayData(cachedData);
                     }
                 })
                 .catch(error => {
@@ -286,13 +286,6 @@
                 mapId: "39252d46211cfba9",
             });
 
-            map.addListener('idle', () => {
-                currentViewport = map.getBounds();
-                if (cachedData && !isHeatmap) {
-                    displayData(cachedData);
-                }
-            });
-
             fetchData();
 
             function fetchData() {
@@ -306,9 +299,17 @@
                     .catch(error => console.error("Error loading data:", error));
             }
 
-            function displayData(data) {
-                // Implement display logic here based on filtering
-            }
+            window.displayData = function(data) {
+                // Clear existing markers or heatmaps here.
+                data.forEach(row => {
+                    const position = new google.maps.LatLng(row.latitude, row.longitude);
+                    new google.maps.Marker({
+                        position,
+                        map,
+                        title: row.properties_shed_company,
+                    });
+                });
+            };
         }
 
         window.toggleHeatmap = function() {
@@ -318,7 +319,7 @@
             }
         };
     </script>
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
 </html>
