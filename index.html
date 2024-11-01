@@ -208,18 +208,19 @@
             // Dropdown toggle
             document.getElementById('companyFilterButton').addEventListener('click', function(e) {
                 e.stopPropagation();
-                document.getElementById('companyFilter').classList.toggle('active');
+                this.parentElement.classList.toggle('active');
             });
 
             document.getElementById('leadStatusFilterButton').addEventListener('click', function(e) {
                 e.stopPropagation();
-                document.getElementById('leadStatusFilter').classList.toggle('active');
+                this.parentElement.classList.toggle('active');
             });
 
             // Close dropdown if clicking outside
             document.addEventListener('click', function() {
-                document.getElementById('companyFilter').classList.remove('active');
-                document.getElementById('leadStatusFilter').classList.remove('active');
+                document.querySelectorAll('.dropdown').forEach(function(dropdown) {
+                    dropdown.classList.remove('active');
+                });
             });
         });
 
@@ -248,12 +249,12 @@
             let currentClusterer = null;
 
             const companyIcons = {
-                "quality structures": "https://path-to-quality-structures-icon.png",
-                "champion buildings": "https://path-to-champion-buildings-icon.png",
-                "bitterroot shedz": "https://path-to-bitterroot-shedz-icon.png",
-                "trupoint backyards": "https://path-to-trupoint-backyards-icon.png",
-                "mountain view barns": "https://path-to-mountain-view-barns-icon.png",
-                "eshs utility buildings": "https://path-to-eshs-utility-buildings-icon.png"
+                "quality structures": "https://example.com/icons/quality-structures-icon.png",
+                "champion buildings": "https://example.com/icons/champion-buildings-icon.png",
+                "bitterroot shedz": "https://example.com/icons/bitterroot-shedz-icon.png",
+                "trupoint backyards": "https://example.com/icons/trupoint-backyards-icon.png",
+                "mountain view barns": "https://example.com/icons/mountain-view-barns-icon.png",
+                "eshs utility buildings": "https://example.com/icons/eshs-utility-buildings-icon.png"
             };
 
             map = new google.maps.Map(document.getElementById("map"), {
@@ -280,24 +281,45 @@
                 clearMap();
 
                 const validData = data.filter(row => !isNaN(row.latitude) && !isNaN(row.longitude));
+
+                // Apply filters
+                const selectedCompanies = Array.from(document.querySelectorAll('#companyFilter input:checked')).map(input => input.value.toLowerCase());
+                const selectedLeadStatuses = Array.from(document.querySelectorAll('#leadStatusFilter input:checked')).map(input => input.value.toLowerCase());
+
+                const filteredData = validData.filter(row => {
+                    let include = true;
+                    if (startDateValue && endDateValue) {
+                        const createDate = new Date(row.createdate);
+                        include = include && createDate >= startDateValue && createDate <= endDateValue;
+                    }
+                    if (selectedCompanies.length > 0) {
+                        const company = row.properties_shed_company?.trim().toLowerCase();
+                        include = include && selectedCompanies.includes(company);
+                    }
+                    if (selectedLeadStatuses.length > 0) {
+                        const status = row.hs_lead_status?.trim().toLowerCase();
+                        include = include && selectedLeadStatuses.includes(status);
+                    }
+                    return include;
+                });
+
                 document.getElementById("legend").style.display = isHeatmap ? "none" : "block";
 
                 if (isHeatmap) {
                     heatmap = new google.maps.visualization.HeatmapLayer({
-                        data: validData.map(row => ({ location: new google.maps.LatLng(row.latitude, row.longitude), weight: 1 })),
+                        data: filteredData.map(row => ({ location: new google.maps.LatLng(row.latitude, row.longitude), weight: 1 })),
                         map: map,
                         radius: 15,
                         opacity: 0.5,
                     });
                 } else {
-                    const newMarkers = validData.map(row => {
+                    const newMarkers = filteredData.map(row => {
                         const companyKey = row.properties_shed_company?.trim().toLowerCase();
-                        const markerIcon = companyIcons[companyKey] || "https://path-to-default-icon.png";
+                        const markerIcon = companyIcons[companyKey] || "https://maps.gstatic.com/mapfiles/api-3/images/spotlight-poi-dotless_hdpi.png";
                         
                         return new google.maps.Marker({
                             position: { lat: row.latitude, lng: row.longitude },
                             icon: { url: markerIcon, scaledSize: new google.maps.Size(24, 24) },
-                            map: map,
                             title: row.properties_shed_company || "Shed Location",
                         });
                     });
@@ -308,8 +330,8 @@
                         markers,
                         algorithm: new markerClusterer.SuperClusterAlgorithm({
                             radius: 80,
-                            maxZoom: 16, // Allows individual pins to remain visible when zoomed close
-                            minPoints: 5
+                            maxZoom: 20, // Increased maxZoom to allow more zoom levels before clustering stops
+                            minPoints: 2 // Reduced minPoints to form clusters with fewer markers
                         })
                     });
                 }
@@ -326,11 +348,14 @@
                 isHeatmap = !isHeatmap;
                 if (cachedData) window.displayData(cachedData);
             };
+            window.refreshData = function() {
+                fetchData();
+            };
         }
     </script>
 
     <!-- Google Maps and MarkerClusterer -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
 </html>
