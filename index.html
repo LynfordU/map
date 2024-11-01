@@ -204,6 +204,23 @@
                 endDateValue = null;
                 if (cachedData && window.displayData) window.displayData(cachedData);
             });
+
+            // Dropdown toggle
+            document.getElementById('companyFilterButton').addEventListener('click', function(e) {
+                e.stopPropagation();
+                document.getElementById('companyFilter').classList.toggle('active');
+            });
+
+            document.getElementById('leadStatusFilterButton').addEventListener('click', function(e) {
+                e.stopPropagation();
+                document.getElementById('leadStatusFilter').classList.toggle('active');
+            });
+
+            // Close dropdown if clicking outside
+            document.addEventListener('click', function() {
+                document.getElementById('companyFilter').classList.remove('active');
+                document.getElementById('leadStatusFilter').classList.remove('active');
+            });
         });
 
         function parseCSV(csvData) {
@@ -218,7 +235,8 @@
                 }, {});
                 row.latitude = parseFloat(row.latitude || row.lat);
                 row.longitude = parseFloat(row.longitude || row.lng || row.long);
-                data.push(row);
+                // Filter out (0, 0) coordinates
+                if (row.latitude !== 0 && row.longitude !== 0) data.push(row);
             });
             return data;
         }
@@ -290,7 +308,7 @@
                         markers,
                         algorithm: new markerClusterer.SuperClusterAlgorithm({
                             radius: 80,
-                            maxZoom: 14,
+                            maxZoom: 16, // Allows individual pins to remain visible when zoomed close
                             minPoints: 5
                         })
                     });
