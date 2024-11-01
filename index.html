@@ -230,12 +230,12 @@
             let currentClusterer = null;
 
             const companyColors = {
-                "quality structures": "#FF6347",
-                "champion buildings": "#4682B4",
-                "bitterroot shedz": "#32CD32",
-                "trupoint backyards": "#FFD700",
-                "mountain view barns": "#FF69B4",
-                "eshs utility buildings": "#8A2BE2"
+                "quality structures": "https://path-to-quality-structures-icon.png",
+                "champion buildings": "https://path-to-champion-buildings-icon.png",
+                "bitterroot shedz": "https://path-to-bitterroot-shedz-icon.png",
+                "trupoint backyards": "https://path-to-trupoint-backyards-icon.png",
+                "mountain view barns": "https://path-to-mountain-view-barns-icon.png",
+                "eshs utility buildings": "https://path-to-eshs-utility-buildings-icon.png"
             };
 
             map = new google.maps.Map(document.getElementById("map"), {
@@ -274,18 +274,13 @@
                 } else {
                     const newMarkers = validData.map(row => {
                         const companyKey = row.properties_shed_company?.trim().toLowerCase();
-                        const markerIcon = {
-                            path: google.maps.SymbolPath.CIRCLE,
-                            scale: 8,
-                            fillColor: companyColors[companyKey] || "#FF0000",
-                            fillOpacity: 1,
-                            strokeWeight: 1
-                        };
+                        const markerIcon = companyColors[companyKey] || "https://path-to-default-icon.png";
                         
-                        return new google.maps.Marker({
+                        return new google.maps.marker.AdvancedMarkerElement({
                             position: { lat: row.latitude, lng: row.longitude },
-                            icon: markerIcon,
-                            title: row.properties_shed_company || "Shed Location",
+                            map: map,
+                            content: `<img src="${markerIcon}" alt="${companyKey} icon">`,
+                            title: row.properties_shed_company || "Shed Location"
                         });
                     });
 
@@ -294,9 +289,9 @@
                         map,
                         markers,
                         algorithm: new markerClusterer.SuperClusterAlgorithm({
-                            radius: 80, // More aggressive clustering
-                            maxZoom: 14, // Clustering remains until closer zoom
-                            minPoints: 5 // Clusters start with fewer points
+                            radius: 80,
+                            maxZoom: 14,
+                            minPoints: 5
                         })
                     });
                 }
