@@ -361,10 +361,8 @@
                 mapId: "39252d46211cfba9",
             });
 
-            let debounceTimer;
             map.addListener('idle', () => {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(updateCounter, 200);
+                updateCounter();
             });
 
             map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById("legend"));
@@ -499,20 +497,12 @@
                 const bounds = map.getBounds();
                 let count = 0;
 
-                if (isHeatmap) {
-                    filteredData.forEach(row => {
-                        const latLng = new google.maps.LatLng(row.latitude, row.longitude);
-                        if (bounds.contains(latLng)) {
-                            count++;
-                        }
-                    });
-                } else {
-                    markers.forEach(marker => {
-                        if (bounds.contains(marker.getPosition())) {
-                            count++;
-                        }
-                    });
-                }
+                filteredData.forEach(row => {
+                    const latLng = new google.maps.LatLng(row.latitude, row.longitude);
+                    if (bounds.contains(latLng)) {
+                        count++;
+                    }
+                });
 
                 document.getElementById('counter').textContent = 'Records in view: ' + count;
             }
@@ -520,6 +510,7 @@
             function toggleHeatmap() {
                 isHeatmap = !isHeatmap;
                 displayData();
+                updateCounter(); // Ensure the counter updates after mode switch
             }
 
             // Expose functions to the global scope if needed
@@ -536,3 +527,4 @@
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
 </html>
+
