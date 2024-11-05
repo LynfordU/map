@@ -109,6 +109,16 @@
             margin-right: 10px;
             border-radius: 50%;
         }
+        /* New styles for the pin counter */
+        #pin-counter {
+            background-color: white;
+            padding: 10px;
+            margin: 10px;
+            font-size: 14px;
+            box-shadow: 0px 3px 6px rgba(0,0,0,0.1);
+            border-radius: 5px;
+            text-align: center;
+        }
         @media (max-width: 768px) {
             #map {
                 height: 60vh;
@@ -175,6 +185,8 @@
 
     <div id="map-container">
         <div id="map"></div>
+        <!-- New pin counter div -->
+        <div id="pin-counter">Data Points Displayed: 0</div>
     </div>
 
     <div id="legend">
@@ -345,7 +357,7 @@
             
             map.addListener('idle', () => {
                 currentViewport = map.getBounds();
-                if (cachedData && !isHeatmap) {
+                if (cachedData) {
                     displayData(cachedData);
                 }
             });
@@ -381,14 +393,12 @@
                     if (startDateValue) {
                         const rowDate = new Date(row.properties_createdate);
                         const startDate = new Date(startDateValue);
-                        // Set start date to start of the day
                         startDate.setHours(0, 0, 0, 0);
                         dateMatch = rowDate >= startDate;
                     }
                     if (endDateValue) {
                         const rowDate = new Date(row.properties_createdate);
                         const endDate = new Date(endDateValue);
-                        // Set end date to end of the day
                         endDate.setHours(23, 59, 59, 999);
                         dateMatch = dateMatch && (rowDate <= endDate);
                     }
@@ -396,13 +406,19 @@
                     return companyMatch && statusMatch && dateMatch;
                 });
 
-                if (currentViewport && !isHeatmap) {
-                    filteredData = filteredData.filter(row => {
+                const validData = filteredData.filter(row => row.latitude && row.longitude);
+
+                // Compute data points currently visible in the viewport
+                let displayedData = validData;
+                if (currentViewport) {
+                    displayedData = validData.filter(row => {
                         return currentViewport.contains({ lat: row.latitude, lng: row.longitude });
                     });
                 }
 
-                const validData = filteredData.filter(row => row.latitude && row.longitude);
+                // Update the pin counter
+                document.getElementById('pin-counter').innerText = 'Data Points Displayed: ' + displayedData.length;
+
                 document.getElementById("legend").style.display = isHeatmap ? "none" : "block";
 
                 if (isHeatmap) {
@@ -417,7 +433,7 @@
                         opacity: 0.5,
                     });
                 } else {
-                    validData.forEach(row => {
+                    displayedData.forEach(row => {
                         const companyKey = row.properties_shed_company?.trim().toLowerCase();
                         const markerIcon = markerIcons[companyKey] || {
                             path: google.maps.SymbolPath.CIRCLE,
@@ -494,7 +510,7 @@
         }
     </script>
     <!-- Load the Google Maps API asynchronously -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
     <!-- Include MarkerClusterer library -->
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
