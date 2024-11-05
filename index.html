@@ -109,15 +109,15 @@
             margin-right: 10px;
             border-radius: 50%;
         }
-        /* New styles for the pin counter */
-        #pin-counter {
+        /* Styles for the counter */
+        #counter {
             background-color: white;
             padding: 10px;
             margin: 10px;
             font-size: 14px;
-            box-shadow: 0px 3px 6px rgba(0,0,0,0.1);
+            box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.1);
             border-radius: 5px;
-            text-align: center;
+            display: block;
         }
         @media (max-width: 768px) {
             #map {
@@ -185,8 +185,6 @@
 
     <div id="map-container">
         <div id="map"></div>
-        <!-- New pin counter div -->
-        <div id="pin-counter">Data Points Displayed: 0</div>
     </div>
 
     <div id="legend">
@@ -197,6 +195,9 @@
         <div><span style="background-color: #FF69B4;"></span> Mountain View Barns</div>
         <div><span style="background-color: #8A2BE2;"></span> Eshs Utility Buildings</div>
     </div>
+
+    <!-- Counter Div -->
+    <div id="counter">Records in view: 0</div>
 
     <script>
         // Global variables
@@ -357,12 +358,11 @@
             
             map.addListener('idle', () => {
                 currentViewport = map.getBounds();
-                if (cachedData) {
-                    displayData(cachedData);
-                }
+                updateCounter();
             });
             
             map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById("legend"));
+            map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById("counter"));
             fetchData();
 
             function fetchData() {
@@ -393,12 +393,14 @@
                     if (startDateValue) {
                         const rowDate = new Date(row.properties_createdate);
                         const startDate = new Date(startDateValue);
+                        // Set start date to start of the day
                         startDate.setHours(0, 0, 0, 0);
                         dateMatch = rowDate >= startDate;
                     }
                     if (endDateValue) {
                         const rowDate = new Date(row.properties_createdate);
                         const endDate = new Date(endDateValue);
+                        // Set end date to end of the day
                         endDate.setHours(23, 59, 59, 999);
                         dateMatch = dateMatch && (rowDate <= endDate);
                     }
@@ -407,18 +409,6 @@
                 });
 
                 const validData = filteredData.filter(row => row.latitude && row.longitude);
-
-                // Compute data points currently visible in the viewport
-                let displayedData = validData;
-                if (currentViewport) {
-                    displayedData = validData.filter(row => {
-                        return currentViewport.contains({ lat: row.latitude, lng: row.longitude });
-                    });
-                }
-
-                // Update the pin counter
-                document.getElementById('pin-counter').innerText = 'Data Points Displayed: ' + displayedData.length;
-
                 document.getElementById("legend").style.display = isHeatmap ? "none" : "block";
 
                 if (isHeatmap) {
@@ -433,7 +423,7 @@
                         opacity: 0.5,
                     });
                 } else {
-                    displayedData.forEach(row => {
+                    validData.forEach(row => {
                         const companyKey = row.properties_shed_company?.trim().toLowerCase();
                         const markerIcon = markerIcons[companyKey] || {
                             path: google.maps.SymbolPath.CIRCLE,
@@ -487,6 +477,7 @@
                         }
                     });
                 }
+                updateCounter();
             }
 
             function clearMap() {
@@ -497,6 +488,58 @@
                 }
                 markers.forEach(marker => marker.setMap(null));
                 markers = [];
+            }
+
+            // Function to update the counter
+            function updateCounter() {
+                if (isHeatmap) {
+                    if (!heatmap || !cachedData || !cachedData.length) {
+                        document.getElementById('counter').textContent = 'Records in view: 0';
+                        return;
+                    }
+                    const bounds = map.getBounds();
+                    let count = 0;
+                    cachedData.forEach(row => {
+                        const companyName = row.properties_shed_company?.trim().toLowerCase();
+                        const status = row.properties_hs_lead_status;
+                        const companyMatch = selectedCompanies.length === 0 || selectedCompanies.includes(companyName);
+                        const statusMatch = selectedLeadStatuses.length === 0 || selectedLeadStatuses.includes(status);
+
+                        // Date filtering
+                        let dateMatch = true;
+                        if (startDateValue) {
+                            const rowDate = new Date(row.properties_createdate);
+                            const startDate = new Date(startDateValue);
+                            startDate.setHours(0, 0, 0, 0);
+                            dateMatch = rowDate >= startDate;
+                        }
+                        if (endDateValue) {
+                            const rowDate = new Date(row.properties_createdate);
+                            const endDate = new Date(endDateValue);
+                            endDate.setHours(23, 59, 59, 999);
+                            dateMatch = dateMatch && (rowDate <= endDate);
+                        }
+
+                        const latLng = new google.maps.LatLng(row.latitude, row.longitude);
+                        if (bounds.contains(latLng) && companyMatch && statusMatch && dateMatch) {
+                            count++;
+                        }
+                    });
+                    document.getElementById('counter').textContent = 'Records in view: ' + count;
+                } else {
+                    if (!markers || !markers.length) {
+                        document.getElementById('counter').textContent = 'Records in view: 0';
+                        return;
+                    }
+                    const bounds = map.getBounds();
+                    let count = 0;
+                    markers.forEach(marker => {
+                        if (bounds.contains(marker.getPosition())) {
+                            count++;
+                        }
+                    });
+                    document.getElementById('counter').textContent = 'Records in view: ' + count;
+                }
             }
 
             // Expose functions to the global scope
@@ -510,8 +553,9 @@
         }
     </script>
     <!-- Load the Google Maps API asynchronously -->
-    <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
+    <script src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
     <!-- Include MarkerClusterer library -->
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
 </html>
+
