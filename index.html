@@ -109,15 +109,14 @@
             margin-right: 10px;
             border-radius: 50%;
         }
-        /* Styles for the counter */
-        #counter {
+        /* New styles for record count */
+        #record-count {
             background-color: white;
             padding: 10px;
             margin: 10px;
             font-size: 14px;
             box-shadow: 0px 3px 6px rgba(0, 0, 0, 0.1);
             border-radius: 5px;
-            display: block;
         }
         @media (max-width: 768px) {
             #map {
@@ -181,6 +180,7 @@
 
         <button onclick="toggleHeatmap()">Toggle Heatmap/Pins</button>
         <button onclick="refreshData()">Refresh Data</button>
+        <button onclick="calculateRecordCount()">Calculate Record Count</button>
     </div>
 
     <div id="map-container">
@@ -196,15 +196,15 @@
         <div><span style="background-color: #8A2BE2;"></span> Eshs Utility Buildings</div>
     </div>
 
-    <!-- Counter Div -->
-    <div id="counter">Records in view: 0</div>
+    <!-- New Record Count Div -->
+    <div id="record-count">
+        Records in view: <span id="record-count-number">0</span>
+    </div>
 
     <script>
         // Global variables
         let cachedData = null;
         let isHeatmap = true;
-        let filteredData = []; // Store filtered data globally
-        let map, heatmap, markers = [], currentClusterer = null;
 
         // Event listeners for filters and buttons
         document.getElementById('companyFilterButton').addEventListener('click', function(e) {
@@ -239,9 +239,8 @@
         document.querySelectorAll('#companyFilter input, #leadStatusFilter input, #startDate, #endDate').forEach(element => {
             element.addEventListener('change', () => {
                 updateFilterButtonText();
-                if (cachedData) {
-                    applyFilters();
-                    displayData();
+                if (cachedData && window.displayData) {
+                    window.displayData(cachedData);
                 }
             });
         });
@@ -282,8 +281,9 @@
                 .then(response => response.ok ? response.text() : Promise.reject(response))
                 .then(csvData => {
                     cachedData = parseCSV(csvData);
-                    applyFilters();
-                    displayData();
+                    if (window.displayData) {
+                        window.displayData(cachedData);
+                    }
                     
                     refreshButton.style.backgroundColor = '#45a049';
                     refreshButton.textContent = 'Data Updated!';
@@ -325,7 +325,13 @@
 
         // Initialize the map and related functions after the API has loaded
         function initMap() {
-            // Initialize variables that depend on 'google' inside 'initMap'
+            // Map-related variables
+            let map;
+            let heatmap;
+            let markers = [];
+            let currentClusterer = null;
+            let currentViewport = null;
+
             const companyColors = {
                 "quality structures": "#FF6347",
                 "champion buildings": "#4682B4",
@@ -346,27 +352,21 @@
                 };
             });
 
-            const defaultIcon = {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: "#FF0000",
-                fillOpacity: 1,
-                strokeWeight: 1
-            };
-
-            // Map initialization
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 44.3148, lng: -85.6024 },
                 zoom: 8,
                 mapId: "39252d46211cfba9",
             });
-
+            
             map.addListener('idle', () => {
-                updateCounter();
+                currentViewport = map.getBounds();
+                if (cachedData && !isHeatmap) {
+                    displayData(cachedData);
+                }
             });
-
+            
             map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById("legend"));
-            map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById("counter"));
+            map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById("record-count"));
             fetchData();
 
             function fetchData() {
@@ -375,21 +375,19 @@
                     .then(response => response.ok ? response.text() : Promise.reject(response))
                     .then(csvData => {
                         cachedData = parseCSV(csvData);
-                        applyFilters();
-                        displayData();
+                        displayData(cachedData);
                     })
                     .catch(error => console.error("Error loading data:", error));
             }
 
-            function applyFilters() {
-                const selectedCompanies = Array.from(document.querySelectorAll("#companyFilter input:checked"))
-                    .map(input => input.value.toLowerCase());
-                const selectedLeadStatuses = Array.from(document.querySelectorAll("#leadStatusFilter input:checked"))
-                    .map(input => input.value);
+            function displayData(data) {
+                clearMap();
+                const selectedCompanies = Array.from(document.querySelectorAll("#companyFilter input:checked")).map(input => input.value.toLowerCase());
+                const selectedLeadStatuses = Array.from(document.querySelectorAll("#leadStatusFilter input:checked")).map(input => input.value);
                 const startDateValue = document.getElementById('startDate').value;
                 const endDateValue = document.getElementById('endDate').value;
 
-                filteredData = cachedData.filter(row => {
+                let filteredData = data.filter(row => {
                     const companyName = row.properties_shed_company?.trim().toLowerCase();
                     const companyMatch = selectedCompanies.length === 0 || selectedCompanies.includes(companyName);
                     const statusMatch = selectedLeadStatuses.length === 0 || selectedLeadStatuses.includes(row.properties_hs_lead_status);
@@ -411,30 +409,44 @@
 
                     return companyMatch && statusMatch && dateMatch;
                 });
-            }
 
-            function displayData() {
-                clearMap();
+                if (currentViewport && !isHeatmap) {
+                    filteredData = filteredData.filter(row => {
+                        return currentViewport.contains({ lat: row.latitude, lng: row.longitude });
+                    });
+                }
 
+                const validData = filteredData.filter(row => row.latitude && row.longitude);
                 document.getElementById("legend").style.display = isHeatmap ? "none" : "block";
 
                 if (isHeatmap) {
                     heatmap = new google.maps.visualization.HeatmapLayer({
-                        data: filteredData.map(row => new google.maps.LatLng(row.latitude, row.longitude)),
+                        data: validData.map(row => ({
+                            location: new google.maps.LatLng(row.latitude, row.longitude),
+                            weight: 1
+                        })),
                         map: map,
                         dissipating: true,
                         radius: 15,
                         opacity: 0.5,
                     });
                 } else {
-                    markers = filteredData.map(row => {
+                    validData.forEach(row => {
                         const companyKey = row.properties_shed_company?.trim().toLowerCase();
-                        const markerIcon = markerIcons[companyKey] || defaultIcon;
-                        return new google.maps.Marker({
+                        const markerIcon = markerIcons[companyKey] || {
+                            path: google.maps.SymbolPath.CIRCLE,
+                            scale: 8,
+                            fillColor: "#FF0000",
+                            fillOpacity: 1,
+                            strokeWeight: 1
+                        };
+                        
+                        const marker = new google.maps.Marker({
                             position: { lat: row.latitude, lng: row.longitude },
                             title: row.properties_shed_company || "Shed Location",
                             icon: markerIcon
                         });
+                        markers.push(marker);
                     });
 
                     currentClusterer = new markerClusterer.MarkerClusterer({
@@ -473,7 +485,6 @@
                         }
                     });
                 }
-                updateCounter(); // Update counter after data is displayed
             }
 
             function clearMap() {
@@ -482,45 +493,70 @@
                     currentClusterer.clearMarkers();
                     currentClusterer = null;
                 }
-                if (markers.length) {
-                    markers.forEach(marker => marker.setMap(null));
-                    markers = [];
-                }
+                markers.forEach(marker => marker.setMap(null));
+                markers = [];
             }
 
-            // Optimized updateCounter function
-            function updateCounter() {
-                if (!filteredData || filteredData.length === 0) {
-                    document.getElementById('counter').textContent = 'Records in view: 0';
+            // Expose functions to the global scope
+            window.displayData = displayData;
+            window.toggleHeatmap = function() {
+                isHeatmap = !isHeatmap;
+                if (cachedData) {
+                    displayData(cachedData);
+                }
+            };
+
+            // Calculate Record Count Function
+            function calculateRecordCount() {
+                if (!cachedData) {
+                    alert('Data is not loaded yet.');
+                    return;
+                }
+                
+                const bounds = map.getBounds();
+                if (!bounds) {
+                    alert('Map bounds are not available.');
                     return;
                 }
 
-                let count = 0;
+                const selectedCompanies = Array.from(document.querySelectorAll("#companyFilter input:checked")).map(input => input.value.toLowerCase());
+                const selectedLeadStatuses = Array.from(document.querySelectorAll("#leadStatusFilter input:checked")).map(input => input.value);
+                const startDateValue = document.getElementById('startDate').value;
+                const endDateValue = document.getElementById('endDate').value;
 
-                // For heatmap mode, use the filtered data length
-                if (isHeatmap) {
-                    count = filteredData.length;
-                } 
-                // For marker mode, use the number of markers
-                else if (currentClusterer) {
-                    count = markers.length;
-                }
+                let filteredData = cachedData.filter(row => {
+                    const companyName = row.properties_shed_company?.trim().toLowerCase();
+                    const companyMatch = selectedCompanies.length === 0 || selectedCompanies.includes(companyName);
+                    const statusMatch = selectedLeadStatuses.length === 0 || selectedLeadStatuses.includes(row.properties_hs_lead_status);
+                    
+                    // Date filtering
+                    let dateMatch = true;
+                    if (startDateValue) {
+                        const rowDate = new Date(row.properties_createdate);
+                        const startDate = new Date(startDateValue);
+                        startDate.setHours(0, 0, 0, 0);
+                        dateMatch = rowDate >= startDate;
+                    }
+                    if (endDateValue) {
+                        const rowDate = new Date(row.properties_createdate);
+                        const endDate = new Date(endDateValue);
+                        endDate.setHours(23, 59, 59, 999);
+                        dateMatch = dateMatch && (rowDate <= endDate);
+                    }
 
-                document.getElementById('counter').textContent = 'Records in view: ' + count;
+                    return companyMatch && statusMatch && dateMatch;
+                });
+
+                const dataInView = filteredData.filter(row => {
+                    const latLng = new google.maps.LatLng(row.latitude, row.longitude);
+                    return bounds.contains(latLng);
+                });
+
+                const count = dataInView.length;
+                document.getElementById('record-count-number').textContent = count;
             }
-
-            function toggleHeatmap() {
-                isHeatmap = !isHeatmap;
-                displayData();
-            }
-
-            // Expose functions to the global scope if needed
-            window.toggleHeatmap = toggleHeatmap;
-            window.refreshData = refreshData;
+            window.calculateRecordCount = calculateRecordCount;
         }
-
-        // Initialize the map after the API has loaded
-        window.initMap = initMap;
     </script>
     <!-- Load the Google Maps API asynchronously -->
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyBRxz4GVtvGG_rrW3QAmC_gtUG-mYckcvo&map_ids=39252d46211cfba9&libraries=visualization&callback=initMap" async defer></script>
@@ -528,5 +564,6 @@
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
 </html>
+
 
 
