@@ -70,7 +70,7 @@
             min-width: 100%;
             box-shadow: 0px 8px 16px rgba(0,0,0,0.1);
             z-index: 1;
-            max-height: 300px; /* Increased height for date inputs */
+            max-height: 300px;
             overflow-y: auto;
             padding: 10px;
             border-radius: 5px;
@@ -205,14 +205,6 @@
         let isHeatmap = true;
         let filteredData = []; // Store filtered data globally
         let map, heatmap, markers = [], currentClusterer = null;
-        let markerIcons = {};
-        const defaultIcon = {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 8,
-            fillColor: "#FF0000",
-            fillOpacity: 1,
-            strokeWeight: 1
-        };
 
         // Event listeners for filters and buttons
         document.getElementById('companyFilterButton').addEventListener('click', function(e) {
@@ -331,7 +323,9 @@
             return data;
         }
 
+        // Initialize the map and related functions after the API has loaded
         function initMap() {
+            // Initialize variables that depend on 'google' inside 'initMap'
             const companyColors = {
                 "quality structures": "#FF6347",
                 "champion buildings": "#4682B4",
@@ -341,6 +335,7 @@
                 "eshs utility buildings": "#8A2BE2"
             };
 
+            const markerIcons = {};
             Object.entries(companyColors).forEach(([company, color]) => {
                 markerIcons[company] = {
                     path: google.maps.SymbolPath.CIRCLE,
@@ -351,173 +346,185 @@
                 };
             });
 
+            const defaultIcon = {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: "#FF0000",
+                fillOpacity: 1,
+                strokeWeight: 1
+            };
+
             // Map initialization
             map = new google.maps.Map(document.getElementById("map"), {
                 center: { lat: 44.3148, lng: -85.6024 },
                 zoom: 8,
                 mapId: "39252d46211cfba9",
             });
-            
+
             let debounceTimer;
             map.addListener('idle', () => {
                 clearTimeout(debounceTimer);
                 debounceTimer = setTimeout(updateCounter, 200);
             });
-            
+
             map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById("legend"));
             map.controls[google.maps.ControlPosition.RIGHT_TOP].push(document.getElementById("counter"));
             fetchData();
-        }
 
-        function fetchData() {
-            const url = "https://storage.googleapis.com/contact-address-bucket/contacts.csv";
-            fetch(url)
-                .then(response => response.ok ? response.text() : Promise.reject(response))
-                .then(csvData => {
-                    cachedData = parseCSV(csvData);
-                    applyFilters();
-                    displayData();
-                })
-                .catch(error => console.error("Error loading data:", error));
-        }
+            function fetchData() {
+                const url = "https://storage.googleapis.com/contact-address-bucket/contacts.csv";
+                fetch(url)
+                    .then(response => response.ok ? response.text() : Promise.reject(response))
+                    .then(csvData => {
+                        cachedData = parseCSV(csvData);
+                        applyFilters();
+                        displayData();
+                    })
+                    .catch(error => console.error("Error loading data:", error));
+            }
 
-        function applyFilters() {
-            const selectedCompanies = Array.from(document.querySelectorAll("#companyFilter input:checked"))
-                .map(input => input.value.toLowerCase());
-            const selectedLeadStatuses = Array.from(document.querySelectorAll("#leadStatusFilter input:checked"))
-                .map(input => input.value);
-            const startDateValue = document.getElementById('startDate').value;
-            const endDateValue = document.getElementById('endDate').value;
+            function applyFilters() {
+                const selectedCompanies = Array.from(document.querySelectorAll("#companyFilter input:checked"))
+                    .map(input => input.value.toLowerCase());
+                const selectedLeadStatuses = Array.from(document.querySelectorAll("#leadStatusFilter input:checked"))
+                    .map(input => input.value);
+                const startDateValue = document.getElementById('startDate').value;
+                const endDateValue = document.getElementById('endDate').value;
 
-            filteredData = cachedData.filter(row => {
-                const companyName = row.properties_shed_company?.trim().toLowerCase();
-                const companyMatch = selectedCompanies.length === 0 || selectedCompanies.includes(companyName);
-                const statusMatch = selectedLeadStatuses.length === 0 || selectedLeadStatuses.includes(row.properties_hs_lead_status);
-                
-                // Date filtering
-                let dateMatch = true;
-                if (startDateValue) {
-                    const rowDate = new Date(row.properties_createdate);
-                    const startDate = new Date(startDateValue);
-                    startDate.setHours(0, 0, 0, 0);
-                    dateMatch = rowDate >= startDate;
-                }
-                if (endDateValue) {
-                    const rowDate = new Date(row.properties_createdate);
-                    const endDate = new Date(endDateValue);
-                    endDate.setHours(23, 59, 59, 999);
-                    dateMatch = dateMatch && (rowDate <= endDate);
-                }
+                filteredData = cachedData.filter(row => {
+                    const companyName = row.properties_shed_company?.trim().toLowerCase();
+                    const companyMatch = selectedCompanies.length === 0 || selectedCompanies.includes(companyName);
+                    const statusMatch = selectedLeadStatuses.length === 0 || selectedLeadStatuses.includes(row.properties_hs_lead_status);
+                    
+                    // Date filtering
+                    let dateMatch = true;
+                    if (startDateValue) {
+                        const rowDate = new Date(row.properties_createdate);
+                        const startDate = new Date(startDateValue);
+                        startDate.setHours(0, 0, 0, 0);
+                        dateMatch = rowDate >= startDate;
+                    }
+                    if (endDateValue) {
+                        const rowDate = new Date(row.properties_createdate);
+                        const endDate = new Date(endDateValue);
+                        endDate.setHours(23, 59, 59, 999);
+                        dateMatch = dateMatch && (rowDate <= endDate);
+                    }
 
-                return companyMatch && statusMatch && dateMatch;
-            });
-        }
-
-        function displayData() {
-            clearMap();
-
-            document.getElementById("legend").style.display = isHeatmap ? "none" : "block";
-
-            if (isHeatmap) {
-                heatmap = new google.maps.visualization.HeatmapLayer({
-                    data: filteredData.map(row => new google.maps.LatLng(row.latitude, row.longitude)),
-                    map: map,
-                    dissipating: true,
-                    radius: 15,
-                    opacity: 0.5,
+                    return companyMatch && statusMatch && dateMatch;
                 });
-            } else {
-                markers = filteredData.map(row => {
-                    const companyKey = row.properties_shed_company?.trim().toLowerCase();
-                    const markerIcon = markerIcons[companyKey] || defaultIcon;
-                    return new google.maps.Marker({
-                        position: { lat: row.latitude, lng: row.longitude },
-                        title: row.properties_shed_company || "Shed Location",
-                        icon: markerIcon
+            }
+
+            function displayData() {
+                clearMap();
+
+                document.getElementById("legend").style.display = isHeatmap ? "none" : "block";
+
+                if (isHeatmap) {
+                    heatmap = new google.maps.visualization.HeatmapLayer({
+                        data: filteredData.map(row => new google.maps.LatLng(row.latitude, row.longitude)),
+                        map: map,
+                        dissipating: true,
+                        radius: 15,
+                        opacity: 0.5,
                     });
-                });
+                } else {
+                    markers = filteredData.map(row => {
+                        const companyKey = row.properties_shed_company?.trim().toLowerCase();
+                        const markerIcon = markerIcons[companyKey] || defaultIcon;
+                        return new google.maps.Marker({
+                            position: { lat: row.latitude, lng: row.longitude },
+                            title: row.properties_shed_company || "Shed Location",
+                            icon: markerIcon
+                        });
+                    });
 
-                currentClusterer = new markerClusterer.MarkerClusterer({
-                    map,
-                    markers,
-                    algorithm: new markerClusterer.SuperClusterAlgorithm({
-                        radius: 100,
-                        maxZoom: 14,
-                        minPoints: 5
-                    }),
-                    renderer: {
-                        render: ({ count, position }) => {
-                            return new google.maps.Marker({
-                                position,
-                                icon: {
-                                    path: google.maps.SymbolPath.CIRCLE,
-                                    scale: Math.log10(count) * 8 + 12,
-                                    fillColor: "#4285F4",
-                                    fillOpacity: 0.7,
-                                    strokeWeight: 1,
-                                    strokeColor: "#FFFFFF"
-                                },
-                                label: {
-                                    text: String(count),
-                                    color: "white",
-                                    fontSize: "12px"
-                                },
-                                zIndex: 1000 + count
-                            });
+                    currentClusterer = new markerClusterer.MarkerClusterer({
+                        map,
+                        markers,
+                        algorithm: new markerClusterer.SuperClusterAlgorithm({
+                            radius: 100,
+                            maxZoom: 14,
+                            minPoints: 5
+                        }),
+                        renderer: {
+                            render: ({ count, position }) => {
+                                return new google.maps.Marker({
+                                    position,
+                                    icon: {
+                                        path: google.maps.SymbolPath.CIRCLE,
+                                        scale: Math.log10(count) * 8 + 12,
+                                        fillColor: "#4285F4",
+                                        fillOpacity: 0.7,
+                                        strokeWeight: 1,
+                                        strokeColor: "#FFFFFF"
+                                    },
+                                    label: {
+                                        text: String(count),
+                                        color: "white",
+                                        fontSize: "12px"
+                                    },
+                                    zIndex: 1000 + count
+                                });
+                            }
+                        },
+                        onClusterClick: (_, cluster, map) => {
+                            const zoom = Math.min(map.getZoom() + 2, 14);
+                            map.setZoom(zoom);
+                            map.setCenter(cluster.position);
                         }
-                    },
-                    onClusterClick: (_, cluster, map) => {
-                        const zoom = Math.min(map.getZoom() + 2, 14);
-                        map.setZoom(zoom);
-                        map.setCenter(cluster.position);
-                    }
-                });
-            }
-            updateCounter(); // Update counter after data is displayed
-        }
-
-        function clearMap() {
-            if (heatmap) heatmap.setMap(null);
-            if (currentClusterer) {
-                currentClusterer.clearMarkers();
-                currentClusterer = null;
-            }
-            if (markers.length) {
-                markers.forEach(marker => marker.setMap(null));
-                markers = [];
-            }
-        }
-
-        function updateCounter() {
-            if (!filteredData || filteredData.length === 0) {
-                document.getElementById('counter').textContent = 'Records in view: 0';
-                return;
+                    });
+                }
+                updateCounter(); // Update counter after data is displayed
             }
 
-            const bounds = map.getBounds();
-            let count = 0;
-
-            if (isHeatmap) {
-                filteredData.forEach(row => {
-                    const latLng = new google.maps.LatLng(row.latitude, row.longitude);
-                    if (bounds.contains(latLng)) {
-                        count++;
-                    }
-                });
-            } else {
-                markers.forEach(marker => {
-                    if (bounds.contains(marker.getPosition())) {
-                        count++;
-                    }
-                });
+            function clearMap() {
+                if (heatmap) heatmap.setMap(null);
+                if (currentClusterer) {
+                    currentClusterer.clearMarkers();
+                    currentClusterer = null;
+                }
+                if (markers.length) {
+                    markers.forEach(marker => marker.setMap(null));
+                    markers = [];
+                }
             }
 
-            document.getElementById('counter').textContent = 'Records in view: ' + count;
-        }
+            function updateCounter() {
+                if (!filteredData || filteredData.length === 0) {
+                    document.getElementById('counter').textContent = 'Records in view: 0';
+                    return;
+                }
 
-        function toggleHeatmap() {
-            isHeatmap = !isHeatmap;
-            displayData();
+                const bounds = map.getBounds();
+                let count = 0;
+
+                if (isHeatmap) {
+                    filteredData.forEach(row => {
+                        const latLng = new google.maps.LatLng(row.latitude, row.longitude);
+                        if (bounds.contains(latLng)) {
+                            count++;
+                        }
+                    });
+                } else {
+                    markers.forEach(marker => {
+                        if (bounds.contains(marker.getPosition())) {
+                            count++;
+                        }
+                    });
+                }
+
+                document.getElementById('counter').textContent = 'Records in view: ' + count;
+            }
+
+            function toggleHeatmap() {
+                isHeatmap = !isHeatmap;
+                displayData();
+            }
+
+            // Expose functions to the global scope if needed
+            window.toggleHeatmap = toggleHeatmap;
+            window.refreshData = refreshData;
         }
 
         // Initialize the map after the API has loaded
@@ -529,5 +536,3 @@
     <script src="https://unpkg.com/@googlemaps/markerclusterer/dist/index.min.js"></script>
 </body>
 </html>
-
-
